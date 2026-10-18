@@ -1,0 +1,26 @@
+name: verify
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: python -m pip install -r backend/requirements-lock.txt
+      - run: python -m pip install -e backend --no-deps
+      - run: ruff check --config backend/pyproject.toml backend sandbox scripts
+      - run: ruff format --check --config backend/pyproject.toml backend sandbox scripts
+      - run: python -m pytest backend/tests -q
+      - run: npm ci && npm test && npm run build
+        working-directory: frontend
+      - run: docker build -t ase-sandbox:1 sandbox
+      - run: python scripts/evaluate.py --docker --output evaluation-docker.json
